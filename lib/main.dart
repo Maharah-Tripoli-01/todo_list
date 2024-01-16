@@ -9,38 +9,11 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       home: HomePage(),
     );
   }
 }
-//
-// class TaskListTile extends StatefulWidget {
-//   const TaskListTile({super.key, required this.title});
-//
-//   final String title;
-//   final bool value;
-//
-//   @override
-//   State<TaskListTile> createState() => _TaskListTileState();
-// }
-//
-// class _TaskListTileState extends State<TaskListTile> {
-//   @override
-//   Widget build(BuildContext context) {
-//     return CheckboxListTile(
-//       value: value,
-//       title: Text(
-//         title,
-//       ),
-//       onChanged: (_) {
-//         setState(() {
-//           checked = !checked;
-//         });
-//       },
-//     );
-//   }
-// }
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -60,33 +33,58 @@ class _HomePageState extends State<HomePage> {
     final checkedTask = tasks.where((element) => element.checked).length;
     final percentage = checkedTask / tasks.length; // 0 - 1
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('TodoList'),
-        centerTitle: true,
+    return TasksInheritedWidget(
+      tasks: tasks,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('TodoList'),
+          centerTitle: true,
+        ),
+        body: Column(
+          children: [
+            LinearProgressIndicator(value: percentage),
+            Expanded(
+              child: TasksList(onChanged: (index, task) {
+                setState(() {
+                  final newTask = task.copyWith(
+                    checked: !task.checked,
+                  );
+                  tasks[index] = newTask;
+                });
+              }),
+            )
+          ],
+        ),
       ),
-      body: Column(
-        children: [
-          LinearProgressIndicator(value: percentage),
-          ...tasks.indexed.map(
-            (item) {
-              final (index, task) = item;
-              return CheckboxListTile(
-                title: Text(task.title),
-                value: task.checked,
-                onChanged: (value) {
-                  setState(() {
-                    final newTask = task.copyWith(
-                      checked: !task.checked,
-                    );
-                    tasks[index] = newTask;
-                  });
-                },
-              );
-            },
-          )
-        ],
-      ),
+    );
+  }
+}
+
+class TasksList extends StatelessWidget {
+  const TasksList({
+    super.key,
+    required this.onChanged,
+  });
+
+  final void Function(int, Task) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = context
+            .dependOnInheritedWidgetOfExactType<TasksInheritedWidget>()
+            ?.tasks ??
+        [];
+
+    return ListView.builder(
+      itemCount: tasks.length,
+      itemBuilder: (context, index) {
+        final task = tasks[index];
+        return CheckboxListTile(
+          title: Text(task.title),
+          value: task.checked,
+          onChanged: (value) => onChanged(index, task),
+        );
+      },
     );
   }
 }
@@ -108,5 +106,20 @@ class Task {
       title: title ?? this.title,
       checked: checked ?? this.checked,
     );
+  }
+}
+
+class TasksInheritedWidget extends InheritedWidget {
+  const TasksInheritedWidget({
+    super.key,
+    required this.tasks,
+    required super.child,
+  });
+
+  final List<Task> tasks;
+
+  @override
+  bool updateShouldNotify(TasksInheritedWidget oldWidget) {
+    return oldWidget.tasks != tasks;
   }
 }
