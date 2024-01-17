@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 void main() {
   runApp(const MainApp());
@@ -11,33 +11,33 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: ChangeNotifierProvider(
-          create: (context) => TasksModel(
-                tasks: [
-                  Task(title: 'First Task', checked: false),
-                  Task(title: 'Second Task', checked: false),
-                ],
+      home: BlocProvider(
+          create: (context) => TasksCubit(
+                TasksState(
+                  tasks: [
+                    Task(title: 'First Task', checked: false),
+                    Task(title: 'Second Task', checked: false),
+                  ],
+                ),
               ),
-          child: const HomePage()),
+          child: HomePage(),
+      ),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class HomePage extends StatelessWidget {
+  HomePage({super.key});
 
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
+  final textController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    final tasks = context.watch<TasksModel>().tasks;
+    final tasksState = context.watch<TasksCubit>().state;
 
-    final checkedTask = tasks.where((element) => element.checked).length;
-    final percentage = checkedTask / tasks.length; // 0 - 1
+    final checkedTask =
+        tasksState.tasks.where((element) => element.checked).length;
+    final percentage = checkedTask / tasksState.tasks.length; // 0 - 1
 
     return Scaffold(
       appBar: AppBar(
@@ -47,9 +47,26 @@ class _HomePageState extends State<HomePage> {
       body: Column(
         children: [
           LinearProgressIndicator(value: percentage),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            child: TextField(
+              controller: textController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Add Task',
+              ),
+              onSubmitted: (text) {
+                textController.clear();
+                context.read<TasksCubit>().addTask(text);
+              },
+            ),
+          ),
           Expanded(
             child: TasksList(onChanged: (index, task) {
-              context.read<TasksModel>().change(index);
+              context.read<TasksCubit>().change(index);
             }),
           )
         ],
@@ -68,12 +85,12 @@ class TasksList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = context.watch<TasksModel>().tasks;
+    final tasksState = context.watch<TasksCubit>().state;
 
     return ListView.builder(
-      itemCount: tasks.length,
+      itemCount: tasksState.tasks.length,
       itemBuilder: (context, index) {
-        final task = tasks[index];
+        final task = tasksState.tasks[index];
         return CheckboxListTile(
           title: Text(task.title),
           value: task.checked,
@@ -82,6 +99,17 @@ class TasksList extends StatelessWidget {
       },
     );
   }
+}
+
+class TasksState {
+  final List<Task> tasks;
+
+  TasksState({required this.tasks});
+}
+enum FilterType{
+  all,
+  done,
+  notDone
 }
 
 class Task {
@@ -104,16 +132,24 @@ class Task {
   }
 }
 
-class TasksModel extends ChangeNotifier {
-  final List<Task> tasks;
+class TasksCubit extends Cubit<TasksState> {
+  TasksCubit(super.initialState);
 
-  TasksModel({required this.tasks});
+  void addTask(String text) {
+    final task = Task(title: text, checked: false);
+    final tasksState = TasksState(tasks: state.tasks..add(task));
+    emit(tasksState);
+  }
 
   void change(int index) {
-    final task = tasks[index];
-    tasks[index] = task.copyWith(
+    final newTasks = [...state.tasks];
+
+    final task = newTasks[index];
+
+    newTasks[index] = task.copyWith(
       checked: !task.checked,
     );
-    notifyListeners();
+
+    emit(TasksState(tasks: newTasks));
   }
 }
